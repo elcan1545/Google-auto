@@ -14,30 +14,32 @@ echo "======================================="
 echo "Dizin: $SCRIPT_DIR"
 echo ""
 
-nix-shell \
-  -p zlib openssl libffi autoconf libtool pkg-config cmake openjdk17 which ccache git unzip zip \
-  --run '
-    set -e
+# ── Zlib ve diğer nix kütüphanelerinin yollarını bul ──────
+ZLIB_INC=$(pkg-config --cflags zlib | sed 's/-I//')
+ZLIB_LIB=$(pkg-config --libs-only-L zlib | sed 's/-L//')
+OPENSSL_INC=$(pkg-config --cflags openssl 2>/dev/null | sed 's/-I//' || echo "")
+OPENSSL_LIB=$(pkg-config --libs-only-L openssl 2>/dev/null | sed 's/-L//' || echo "")
+LIBFFI_INC=$(pkg-config --cflags libffi 2>/dev/null | sed 's/-I//' || echo "")
 
-    # Java yolu
-    export JAVA_HOME="$(dirname $(dirname $(readlink -f $(which java))))"
-    export PATH="$JAVA_HOME/bin:$PATH"
+# ── Derleme ortamını hazırla ──────────────────────────────
+export CPATH="$ZLIB_INC:$OPENSSL_INC:$LIBFFI_INC:${CPATH:-}"
+export LIBRARY_PATH="$ZLIB_LIB:$OPENSSL_LIB:${LIBRARY_PATH:-}"
+export C_INCLUDE_PATH="$ZLIB_INC:$OPENSSL_INC:$LIBFFI_INC:${C_INCLUDE_PATH:-}"
+export LD_LIBRARY_PATH="$ZLIB_LIB:$OPENSSL_LIB:${LD_LIBRARY_PATH:-}"
+export JAVA_HOME="$(dirname $(dirname $(readlink -f $(which java))))"
+export PATH="$JAVA_HOME/bin:$PATH"
 
-    # Nix paket yollarını buildozer için dışa aç
-    export CPATH="$NIX_CFLAGS_COMPILE"
-    export LIBRARY_PATH="$(echo $NIX_LDFLAGS | tr " " "\n" | grep "^-L" | sed "s/-L//" | tr "\n" ":")"
+echo "Java:      $(java -version 2>&1 | head -1)"
+echo "Buildozer: $(buildozer --version)"
+echo "Zlib inc:  $ZLIB_INC"
+echo ""
+echo ">> Derleme başlıyor... (ilk seferinde SDK/NDK indirir, 20-40 dk sürebilir)"
+echo ""
 
-    echo "Java:     $(java -version 2>&1 | head -1)"
-    echo "Buildozer: $(buildozer --version)"
-    echo ""
-    echo ">> Derleme başlıyor... (ilk seferinde SDK/NDK indirir, 20-40 dk sürebilir)"
-    echo ""
+buildozer android debug
 
-    buildozer android debug
-
-    echo ""
-    echo "======================================="
-    echo "  TAMAMLANDI!"
-    ls bin/*.apk 2>/dev/null && echo "  APK: $(ls bin/*.apk)" || echo "  APK bulunamadi, loglari kontrol edin."
-    echo "======================================="
-  '
+echo ""
+echo "======================================="
+echo "  TAMAMLANDI!"
+ls bin/*.apk 2>/dev/null && echo "  APK: $(ls bin/*.apk)" || echo "  HATA: APK bulunamadı, log'ları kontrol edin."
+echo "======================================="
