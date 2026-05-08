@@ -1,37 +1,33 @@
 [app]
-# Uygulama adı ve paketi
 title = Mail Link Generator
-package.name = mailinkgenerator
+package.name = maillinkgenerator
 package.domain = org.maillink
 
-# Kaynak dosyaları
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas
 
-# Versiyon
 version = 1.0
 
-# Gereksinimler (Android üzerinde çalışacak kütüphaneler)
-requirements = python3==3.11.0,kivy==2.3.0,requests,urllib3,certifi,charset-normalizer,idna
+# Android'de HTTPS (requests + smtplib ssl) için openssl şart
+requirements = python3,kivy==2.3.0,openssl,requests,urllib3,certifi,charset-normalizer,idna
 
-# Android bildirimleri
 android.permissions = INTERNET
 
-# Android API seviyeleri
 android.api = 33
-android.minapi = 21
+android.minapi = 24
 android.ndk = 25b
-android.ndk_api = 21
+android.ndk_api = 24
 android.private_storage = True
+android.accept_sdk_license = True
 
-# Orientation
+# Arkaplan servisleri kapalı
+android.enable_androidx = True
+
 orientation = portrait
-
-# Tam ekran (Android)
 fullscreen = 0
 
-# Log seviyesi
-log_level = 2
+presplash.filename = %(source.dir)s/presplash.png
+icon.filename = %(source.dir)s/icon.png
 
 [buildozer]
 log_level = 2

