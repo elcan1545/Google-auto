@@ -38,7 +38,7 @@ from kivy.metrics import dp
 # Buraya deploy ettikten sonra kendi Replit domain'inizi yazın
 # Örnek: https://mail-link-generator.kullaniciadi.replit.app
 # =============================================================
-BASE_URL = "https://BURAYA_DOMAIN_YAZIN"
+BASE_URL = "https://mail-link-generator--azechat060.replit.app"
 # =============================================================
 
 Window.clearcolor = (0.95, 0.95, 0.97, 1)
