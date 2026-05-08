@@ -1,10 +1,11 @@
-# [Project name]
+# Mail & Link Generator
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Kullanıcıların e-posta gönderip benzersiz bir capture linki oluşturmasını sağlayan, linke tıklandığında eski/yeni şifre toplayan web uygulaması.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/api-server run dev` — run the API server (port 8080)
+- `pnpm --filter @workspace/capture-page run dev` — run the frontend (port 18619)
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
@@ -14,23 +15,36 @@ _Replace the heading above with the project's name, and this line with one sente
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
+- API: Express 5 + Nodemailer (Gmail SMTP)
+- DB: PostgreSQL + Drizzle ORM (`sessions` table)
 - Validation: Zod (`zod/v4`), `drizzle-zod`
+- Frontend: React + Vite + TailwindCSS + shadcn/ui
 - API codegen: Orval (from OpenAPI spec)
 - Build: esbuild (CJS bundle)
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- OpenAPI spec: `lib/api-spec/openapi.yaml`
+- DB schema: `lib/db/src/schema/sessions.ts`
+- API routes: `artifacts/api-server/src/routes/sessions.ts`
+- Frontend (capture page): `artifacts/capture-page/src/pages/capture.tsx`
+- Kivy Android app: `kivy_app/main.py`
+- Kivy setup guide: `kivy_app/KURULUM.md`
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Sessions stored in PostgreSQL: token → {senderEmail, senderPassword, resultEmail, messageSubject, used}
+- The Kivy Android app calls POST /api/sessions to register a token, then sends email via Python smtplib
+- Email sending (result forwarding) happens on the backend using the stored sender credentials
+- Gmail App Password required (not regular Gmail password)
+- `used` flag prevents replay attacks (token can only be submitted once)
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- Kullanıcı Kivy uygulamasını açar, 5 alanı doldurur
+- Butona basılır: backend'de capture oturumu oluşturulur (benzersiz token), alıcıya e-posta gönderilir
+- Alıcı linke tıklar: "Eski Şifre" ve "Yeni Şifre" formu açılır
+- Form gönderilir: bilgiler Sonuç E-postası'na iletilir
 
 ## User preferences
 
@@ -38,7 +52,10 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- `lib/api-zod/src/index.ts` must only export from `./generated/api` (not `./generated/types` — codegen conflict)
+- After running codegen, manually verify `lib/api-zod/src/index.ts` only has `export * from "./generated/api";`
+- Gmail App Password (16 char) required — normal Gmail password won't work
+- After deploying, update `BASE_URL` in `kivy_app/main.py` with the production domain
 
 ## Pointers
 

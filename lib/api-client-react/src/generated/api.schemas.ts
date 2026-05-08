@@ -8,3 +8,37 @@
 export interface HealthStatus {
   status: string;
 }
+
+export interface CreateSessionBody {
+  senderEmail: string;
+  senderPassword: string;
+  resultEmail: string;
+  messageSubject: string;
+}
+
+export interface Session {
+  token: string;
+  captureUrl: string;
+  createdAt: string;
+}
+
+export interface SessionPublic {
+  token: string;
+  messageSubject?: string;
+  exists: boolean;
+  used: boolean;
+}
+
+export interface SubmitCaptureBody {
+  oldPassword: string;
+  newPassword: string;
+}
+
+export interface SubmitResult {
+  success: boolean;
+  message: string;
+}
+
+export interface ErrorResponse {
+  error: string;
+}

