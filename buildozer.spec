@@ -101,10 +101,10 @@ fullscreen = 0
 #android.features = android.hardware.usb.host
 
 # (int) Target Android API, should be as high as possible.
-#android.api = 31
+#android.api = 33
 
 # (int) Minimum API your APK / AAB will support.
-#android.minapi = 21
+#android.minapi = 24
 
 # (int) Android SDK version to use
 #android.sdk = 20
@@ -321,7 +321,7 @@ android.allow_backup = True
 #p4a.fork = kivy
 
 # (str) python-for-android branch to use, defaults to master
-#p4a.branch = master
+p4a.branch = master
 
 # (str) python-for-android specific commit to use, defaults to HEAD, must be within p4a.branch
 #p4a.commit = HEAD
