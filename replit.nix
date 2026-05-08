@@ -1,5 +1,6 @@
 {pkgs}: {
   deps = [
+    pkgs.automake
     pkgs.which
     pkgs.ccache
     pkgs.git
